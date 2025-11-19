@@ -1,0 +1,32 @@
+# Audio Processing
+librosa>=0.10.0
+pydub>=0.25.1
+soundfile>=0.12.1
+audioread>=3.0.0
+
+# Audio Source Separation (for instrument/vocal separation)
+demucs>=4.0.0
+
+# Advanced Music Analysis
+essentia>=2.1b6.dev1110
+
+# LLM Integration
+anthropic>=0.18.0
+
+# Data Models and Validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Output Formats
+PyYAML>=6.0
+
+# Numerical Processing
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.65.0
+
+# Optional: for visualization
+matplotlib>=3.7.0

@@ -1,0 +1,35 @@
+# Music Mood Analyzer Configuration
+
+# Analysis settings
+analysis:
+  # Use LLM for mood interpretation
+  use_llm: true
+
+  # Use source separation for instrument/vocal analysis
+  # Note: Source separation is computationally expensive
+  use_separation: true
+
+  # Default time per lyric line in seconds (null = auto-calculate)
+  time_per_line: null
+
+# LLM settings
+llm:
+  # Model to use for analysis
+  # Options: claude-3-5-haiku-20241022 (fast, cheap), claude-3-5-sonnet-20241022 (better quality)
+  model: "claude-3-5-haiku-20241022"
+
+  # API key (can also be set via ANTHROPIC_API_KEY env var)
+  api_key: null
+
+# Output settings
+output:
+  # Default output format
+  format: "json"  # or "yaml"
+
+  # Include null values in output
+  include_null: false
+
+# Audio processing settings
+audio:
+  # Sample rate for audio processing (Hz)
+  sample_rate: 22050
