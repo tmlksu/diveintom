@@ -29,5 +29,10 @@ scipy>=1.10.0
 python-dotenv>=1.0.0
 tqdm>=4.65.0
 
+# Web Server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
 # Optional: for visualization
 matplotlib>=3.7.0

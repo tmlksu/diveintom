@@ -82,7 +82,36 @@ export ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ## 使い方
 
-### 基本的な使用方法
+### WebUI（推奨）
+
+WebUIを使うと、ブラウザから簡単に音楽解析が行えます。
+
+1. **サーバーの起動**:
+```bash
+python server.py
+```
+
+または、開発モード（自動リロード付き）:
+```bash
+python server.py --reload
+```
+
+2. **ブラウザでアクセス**:
+```
+http://localhost:8000
+```
+
+3. **音楽ファイルをドラッグ&ドロップ**して解析開始！
+
+#### WebUIの機能
+- ドラッグ&ドロップでファイルアップロード
+- LLM解説のオン/オフ切り替え
+- プロバイダー選択（Gemini/Claude）
+- 音源分離のオン/オフ
+- リアルタイムで解析結果を表示
+- JSON形式でダウンロード可能
+
+### コマンドライン（従来の方法）
 
 ```bash
 python main.py <audio_file> --lyrics <lyrics_file>
@@ -289,4 +318,4 @@ MIT License
 - [ ] リアルタイム分析モード
 - [ ] 可視化機能（グラフ生成）
 - [ ] 歌詞の自動タイムスタンプ同期
-- [ ] WebUI
+- [x] WebUI（実装済み）

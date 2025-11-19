@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Mood Analyzer</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone.drag-over {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+
+        .pulse-animation {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s;
+        }
+
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" v-cloak>
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-music text-3xl"></i>
+                        <h1 class="text-3xl font-bold">Music Mood Analyzer</h1>
+                    </div>
+                    <div class="text-sm opacity-90">
+                        <i class="fas fa-robot mr-1"></i>
+                        LLMによる音楽解説
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-8 max-w-6xl">
+            <!-- Upload Section -->
+            <div v-if="!analyzing && !result" class="space-y-6">
+                <!-- Audio File Upload -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">
+                        <i class="fas fa-file-audio mr-2 text-purple-600"></i>
+                        音楽ファイル
+                    </h2>
+
+                    <div
+                        class="drop-zone rounded-lg p-8 text-center cursor-pointer"
+                        :class="{ 'drag-over': isDraggingAudio }"
+                        @dragover.prevent="isDraggingAudio = true"
+                        @dragleave.prevent="isDraggingAudio = false"
+                        @drop.prevent="handleAudioDrop"
+                        @click="$refs.audioInput.click()"
+                    >
+                        <input
+                            type="file"
+                            ref="audioInput"
+                            accept="audio/*"
+                            class="hidden"
+                            @change="handleAudioSelect"
+                        >
+
+                        <div v-if="!audioFile">
+                            <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                            <p class="text-lg font-semibold text-gray-700 mb-2">
+                                音楽ファイルをドラッグ&ドロップ
+                            </p>
+                            <p class="text-sm text-gray-500">
+                                または クリックして選択 (MP3, WAV, FLAC など)
+                            </p>
+                        </div>
+
+                        <div v-else class="flex items-center justify-center space-x-3">
+                            <i class="fas fa-file-audio text-4xl text-purple-600"></i>
+                            <div class="text-left">
+                                <p class="font-semibold text-gray-800">{{ audioFile.name }}</p>
+                                <p class="text-sm text-gray-500">{{ formatFileSize(audioFile.size) }}</p>
+                            </div>
+                            <button
+                                @click.stop="audioFile = null"
+                                class="ml-4 text-red-500 hover:text-red-700"
+                            >
+                                <i class="fas fa-times-circle text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lyrics File Upload (Optional) -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">
+                        <i class="fas fa-file-lines mr-2 text-purple-600"></i>
+                        歌詞ファイル（オプション）
+                    </h2>
+
+                    <div
+                        class="drop-zone rounded-lg p-8 text-center cursor-pointer"
+                        :class="{ 'drag-over': isDraggingLyrics }"
+                        @dragover.prevent="isDraggingLyrics = true"
+                        @dragleave.prevent="isDraggingLyrics = false"
+                        @drop.prevent="handleLyricsDrop"
+                        @click="$refs.lyricsInput.click()"
+                    >
+                        <input
+                            type="file"
+                            ref="lyricsInput"
+                            accept=".txt"
+                            class="hidden"
+                            @change="handleLyricsSelect"
+                        >
+
+                        <div v-if="!lyricsFile">
+                            <i class="fas fa-file-lines text-4xl text-gray-400 mb-3"></i>
+                            <p class="text-lg font-semibold text-gray-700 mb-2">
+                                歌詞ファイルをドラッグ&ドロップ
+                            </p>
+                            <p class="text-sm text-gray-500">
+                                または クリックして選択 (.txt ファイル、1行1フレーズ)
+                            </p>
+                        </div>
+
+                        <div v-else class="flex items-center justify-center space-x-3">
+                            <i class="fas fa-file-lines text-3xl text-purple-600"></i>
+                            <div class="text-left">
+                                <p class="font-semibold text-gray-800">{{ lyricsFile.name }}</p>
+                                <p class="text-sm text-gray-500">{{ formatFileSize(lyricsFile.size) }}</p>
+                            </div>
+                            <button
+                                @click.stop="lyricsFile = null"
+                                class="ml-4 text-red-500 hover:text-red-700"
+                            >
+                                <i class="fas fa-times-circle text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Options -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">
+                        <i class="fas fa-sliders mr-2 text-purple-600"></i>
+                        解析オプション
+                    </h2>
+
+                    <div class="space-y-4">
+                        <!-- LLM Toggle -->
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div class="flex-1">
+                                <label class="font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-robot mr-2 text-indigo-600"></i>
+                                    LLMによる解説を有効化
+                                </label>
+                                <p class="text-sm text-gray-600 mt-1">
+                                    AIが音楽の雰囲気や感情を自然言語で解説します
+                                </p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer ml-4">
+                                <input type="checkbox" v-model="options.useLLM" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- LLM Provider (shown only if LLM is enabled) -->
+                        <div v-if="options.useLLM" class="p-4 bg-gray-50 rounded-lg">
+                            <label class="block font-semibold text-gray-800 mb-2">
+                                <i class="fas fa-brain mr-2 text-indigo-600"></i>
+                                LLMプロバイダー
+                            </label>
+                            <select
+                                v-model="options.llmProvider"
+                                class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            >
+                                <option value="gemini">Gemini (OpenRouter経由) - 推奨・無料</option>
+                                <option value="claude">Claude (Anthropic)</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-2">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                {{ options.llmProvider === 'gemini' ? 'OPENROUTER_API_KEY' : 'ANTHROPIC_API_KEY' }} が必要です
+                            </p>
+                        </div>
+
+                        <!-- Source Separation Toggle -->
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div class="flex-1">
+                                <label class="font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-waveform-lines mr-2 text-indigo-600"></i>
+                                    音源分離を有効化
+                                </label>
+                                <p class="text-sm text-gray-600 mt-1">
+                                    楽器とボーカルを分離してより詳細に解析（処理時間が長くなります）
+                                </p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer ml-4">
+                                <input type="checkbox" v-model="options.useSeparation" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analyze Button -->
+                <div class="text-center">
+                    <button
+                        @click="startAnalysis"
+                        :disabled="!audioFile"
+                        class="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                        <i class="fas fa-play mr-2"></i>
+                        解析開始
+                    </button>
+                </div>
+            </div>
+
+            <!-- Analyzing State -->
+            <div v-if="analyzing" class="bg-white rounded-lg shadow-md p-12 text-center">
+                <div class="pulse-animation mb-6">
+                    <i class="fas fa-spinner fa-spin text-6xl text-purple-600"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">解析中...</h2>
+                <p class="text-gray-600 mb-6">音楽を分析しています。しばらくお待ちください。</p>
+
+                <div v-if="options.useSeparation" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 inline-block text-left">
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-yellow-700 mr-2"></i>
+                        <p class="text-sm text-yellow-700">
+                            音源分離が有効です。処理には5-10分程度かかる場合があります。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Display -->
+            <div v-if="result" class="space-y-6">
+                <!-- Header with Back Button -->
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-chart-line mr-2 text-purple-600"></i>
+                        解析結果
+                    </h2>
+                    <button
+                        @click="reset"
+                        class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        新しい解析
+                    </button>
+                </div>
+
+                <!-- Song Overview -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">楽曲情報</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">タイトル</p>
+                            <p class="text-lg font-semibold text-purple-900">{{ result.title || 'Unknown' }}</p>
+                        </div>
+                        <div class="bg-indigo-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">長さ</p>
+                            <p class="text-lg font-semibold text-indigo-900">{{ formatDuration(result.duration) }}</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">テンポ</p>
+                            <p class="text-lg font-semibold text-blue-900">{{ result.overall_tempo.toFixed(1) }} BPM</p>
+                        </div>
+                        <div class="bg-cyan-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">キー</p>
+                            <p class="text-lg font-semibold text-cyan-900">{{ result.overall_key || 'Unknown' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Overall Mood (if LLM was used) -->
+                    <div v-if="result.overall_mood" class="mt-6 p-4 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-lg">
+                        <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                            <i class="fas fa-heart mr-2 text-purple-600"></i>
+                            全体的なムード
+                        </h4>
+                        <p class="text-gray-700">{{ result.overall_mood }}</p>
+                    </div>
+                </div>
+
+                <!-- Lyric Segments -->
+                <div v-if="result.lyric_segments && result.lyric_segments.length > 0" class="space-y-4">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-list mr-2 text-purple-600"></i>
+                        セグメント解析
+                    </h3>
+
+                    <div
+                        v-for="segment in result.lyric_segments"
+                        :key="segment.line_number"
+                        class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                    >
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <span class="inline-block w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                        {{ segment.line_number }}
+                                    </span>
+                                    <h4 class="text-lg font-semibold text-gray-800">{{ segment.lyric_text }}</h4>
+                                </div>
+                                <p class="text-sm text-gray-500">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    {{ formatTime(segment.start_time) }} - {{ formatTime(segment.end_time) }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Musical Features -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-xs text-gray-600">テンポ</p>
+                                <p class="font-semibold text-gray-800">{{ segment.musical_features.tempo.toFixed(0) }} BPM</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-xs text-gray-600">エネルギー</p>
+                                <p class="font-semibold text-gray-800">{{ (segment.musical_features.energy * 100).toFixed(0) }}%</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-xs text-gray-600">キー</p>
+                                <p class="font-semibold text-gray-800">{{ segment.musical_features.key }} {{ segment.musical_features.mode }}</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-xs text-gray-600">音量</p>
+                                <p class="font-semibold text-gray-800">{{ segment.musical_features.loudness.toFixed(1) }} dB</p>
+                            </div>
+                        </div>
+
+                        <!-- Instruments -->
+                        <div v-if="segment.instruments && segment.instruments.length > 0" class="mb-4">
+                            <p class="text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-guitar mr-1 text-purple-600"></i>
+                                楽器
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    v-for="inst in segment.instruments"
+                                    :key="inst.name"
+                                    class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm"
+                                >
+                                    {{ inst.name }}
+                                    <span v-if="inst.playing_technique" class="text-xs opacity-75">
+                                        ({{ inst.playing_technique }})
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Vocal Info -->
+                        <div v-if="segment.vocal_info && segment.vocal_info.present" class="mb-4">
+                            <p class="text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-microphone mr-1 text-purple-600"></i>
+                                ボーカル
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
+                                    {{ segment.vocal_info.gender || 'Unknown' }}
+                                </span>
+                                <span v-if="segment.vocal_info.singing_style" class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
+                                    {{ segment.vocal_info.singing_style }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- LLM Interpretation -->
+                        <div v-if="segment.mood_interpretation" class="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-lg">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                <div>
+                                    <p class="text-xs text-gray-600 mb-1">ムード</p>
+                                    <p class="font-semibold text-purple-900">{{ segment.mood_interpretation.mood }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-600 mb-1">雰囲気</p>
+                                    <p class="font-semibold text-indigo-900">{{ segment.mood_interpretation.atmosphere }}</p>
+                                </div>
+                            </div>
+
+                            <div v-if="segment.mood_interpretation.emotions && segment.mood_interpretation.emotions.length > 0" class="mb-3">
+                                <p class="text-xs text-gray-600 mb-1">感情</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span
+                                        v-for="emotion in segment.mood_interpretation.emotions"
+                                        :key="emotion"
+                                        class="px-2 py-1 bg-purple-200 text-purple-900 rounded text-xs"
+                                    >
+                                        {{ emotion }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-xs text-gray-600 mb-1">解説</p>
+                                <p class="text-sm text-gray-700">{{ segment.mood_interpretation.meaning }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download Button -->
+                <div class="text-center">
+                    <button
+                        @click="downloadResult"
+                        class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <i class="fas fa-download mr-2"></i>
+                        JSON形式でダウンロード
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error Display -->
+            <div v-if="error" class="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-exclamation-circle text-red-600 text-xl mr-2"></i>
+                    <h3 class="text-lg font-semibold text-red-800">エラーが発生しました</h3>
+                </div>
+                <p class="text-red-700 mb-4">{{ error }}</p>
+                <button
+                    @click="reset"
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                    <i class="fas fa-redo mr-2"></i>
+                    リトライ
+                </button>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white py-6 mt-12">
+            <div class="container mx-auto px-4 text-center">
+                <p class="text-sm opacity-75">
+                    <i class="fas fa-music mr-1"></i>
+                    Music Mood Analyzer - Powered by AI
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    audioFile: null,
+                    lyricsFile: null,
+                    isDraggingAudio: false,
+                    isDraggingLyrics: false,
+                    options: {
+                        useLLM: true,
+                        llmProvider: 'gemini',
+                        useSeparation: false
+                    },
+                    analyzing: false,
+                    result: null,
+                    error: null
+                };
+            },
+            methods: {
+                handleAudioDrop(e) {
+                    this.isDraggingAudio = false;
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.audioFile = files[0];
+                    }
+                },
+                handleAudioSelect(e) {
+                    const files = e.target.files;
+                    if (files.length > 0) {
+                        this.audioFile = files[0];
+                    }
+                },
+                handleLyricsDrop(e) {
+                    this.isDraggingLyrics = false;
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.lyricsFile = files[0];
+                    }
+                },
+                handleLyricsSelect(e) {
+                    const files = e.target.files;
+                    if (files.length > 0) {
+                        this.lyricsFile = files[0];
+                    }
+                },
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+                },
+                formatDuration(seconds) {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                },
+                formatTime(seconds) {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                },
+                async startAnalysis() {
+                    if (!this.audioFile) {
+                        alert('音楽ファイルを選択してください');
+                        return;
+                    }
+
+                    this.analyzing = true;
+                    this.error = null;
+                    this.result = null;
+
+                    const formData = new FormData();
+                    formData.append('audio_file', this.audioFile);
+
+                    if (this.lyricsFile) {
+                        formData.append('lyrics_file', this.lyricsFile);
+                    }
+
+                    formData.append('use_llm', this.options.useLLM);
+                    formData.append('use_separation', this.options.useSeparation);
+                    formData.append('llm_provider', this.options.llmProvider);
+
+                    try {
+                        const response = await fetch('/api/analyze', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.detail || 'Analysis failed');
+                        }
+
+                        this.result = await response.json();
+                    } catch (err) {
+                        this.error = err.message;
+                        console.error('Analysis error:', err);
+                    } finally {
+                        this.analyzing = false;
+                    }
+                },
+                downloadResult() {
+                    if (!this.result) return;
+
+                    const dataStr = JSON.stringify(this.result, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${this.result.title || 'analysis'}_result.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                },
+                reset() {
+                    this.audioFile = null;
+                    this.lyricsFile = null;
+                    this.result = null;
+                    this.error = null;
+                    this.analyzing = false;
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

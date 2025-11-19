@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+
+# Analysis outputs
+*_analysis.json
+*_analysis.yaml
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+# Uploaded files (server)
+uploads/
+music_analyzer_uploads/
+
+# Demucs separated audio
+separated/
+htdemucs/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
