@@ -62,14 +62,22 @@ brew install ffmpeg
 ```
 
 4. APIキーの設定（LLM分析を使用する場合）:
+
+**Gemini使用（デフォルト、推奨）:**
 ```bash
 cp .env.example .env
-# .envファイルを編集してANTHROPIC_API_KEYを設定
+# .envファイルを編集してOPENROUTER_API_KEYを設定
+# OpenRouter APIキーは https://openrouter.ai/keys から取得
 ```
 
 または環境変数として設定:
 ```bash
-export ANTHROPIC_API_KEY=your_api_key_here
+export OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
+**Claude使用:**
+```bash
+export ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
 ## 使い方
@@ -83,8 +91,14 @@ python main.py <audio_file> --lyrics <lyrics_file>
 ### 例
 
 ```bash
-# JSON形式で出力（デフォルト）
+# Gemini使用（デフォルト、JSON形式で出力）
 python main.py song.mp3 --lyrics lyrics.txt
+
+# Claudeを使用
+python main.py song.mp3 --lyrics lyrics.txt --provider claude
+
+# 特定のモデルを指定
+python main.py song.mp3 --lyrics lyrics.txt --provider gemini --model google/gemini-pro
 
 # YAML形式で出力
 python main.py song.mp3 --lyrics lyrics.txt --format yaml --output analysis.yaml
@@ -107,10 +121,12 @@ python main.py song.mp3 --lyrics lyrics.txt --time-per-line 5.0
 | `--lyrics`, `-l` | 歌詞テキストファイルのパス（1行＝1フレーズ） |
 | `--output`, `-o` | 出力ファイルパス（デフォルト: `<audio_name>_analysis.json`） |
 | `--format`, `-f` | 出力形式: `json` または `yaml`（デフォルト: `json`） |
+| `--provider`, `-p` | LLMプロバイダー: `claude` または `gemini`（デフォルト: `gemini`） |
+| `--model`, `-m` | 使用するLLMモデル（デフォルト: プロバイダー固有のデフォルト） |
 | `--no-llm` | LLMによるムード解釈を無効化 |
 | `--no-separation` | 音源分離を無効化（高速化） |
 | `--time-per-line` | 歌詞の各行に割り当てる固定時間（秒）（デフォルト: 自動計算） |
-| `--api-key` | Anthropic APIキー（環境変数でも設定可） |
+| `--api-key` | LLMプロバイダーのAPIキー（環境変数でも設定可） |
 
 ### 歌詞ファイルの形式
 
@@ -223,8 +239,12 @@ main.py
 - **音源分離あり**: 3-5分の楽曲で約5-10分
 - **音源分離なし**: 3-5分の楽曲で約30秒-1分
 
-### LLMコスト（Claude 3.5 Haiku使用時）
-- 約 $0.01-0.05 per song（歌詞の行数による）
+### LLMコスト
+- **Gemini 2.0 Flash（デフォルト）**: 無料（OpenRouterの無料ティア使用時）
+- **Claude 3.5 Haiku**: 約 $0.01-0.05 per song（歌詞の行数による）
+- **Gemini Pro（有料）**: 約 $0.002-0.01 per song
+
+**推奨**: コスト削減のため、デフォルトのGemini無料ティアの使用をお勧めします。
 
 ## トラブルシューティング
 
@@ -241,6 +261,15 @@ Source separation failed
 → `--no-separation` オプションを使用して音源分離を無効化できます
 
 ### APIキーエラー
+
+**Gemini使用時:**
+```
+ValueError: OpenRouter API key required
+```
+→ `.env`ファイルまたは環境変数で`OPENROUTER_API_KEY`を設定してください
+→ APIキーは https://openrouter.ai/keys から取得できます
+
+**Claude使用時:**
 ```
 ValueError: API key required
 ```

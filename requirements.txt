@@ -12,6 +12,7 @@ essentia>=2.1b6.dev1110
 
 # LLM Integration
 anthropic>=0.18.0
+openai>=1.0.0  # For OpenRouter (Gemini and other models)
 
 # Data Models and Validation
 pydantic>=2.0.0

@@ -1,10 +1,12 @@
 """
 LLM-based mood and meaning analysis.
+Supports multiple providers: Claude (direct) and Gemini (via OpenRouter).
 """
 import os
 import json
 from typing import Dict, List, Optional
 from anthropic import Anthropic
+from openai import OpenAI
 
 from data_models import MoodInterpretation, MusicalFeatures, InstrumentInfo, VocalInfo
 
@@ -12,23 +14,48 @@ from data_models import MoodInterpretation, MusicalFeatures, InstrumentInfo, Voc
 class LLMAnalyzer:
     """Uses LLM to interpret musical features and generate mood analysis."""
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-5-haiku-20241022"):
+    def __init__(
+        self,
+        provider: str = "claude",
+        api_key: Optional[str] = None,
+        model: Optional[str] = None
+    ):
         """
         Initialize the LLM analyzer.
 
         Args:
-            api_key: Anthropic API key (if None, will use ANTHROPIC_API_KEY env var)
-            model: Model to use (default: claude-3-5-haiku for cost efficiency)
+            provider: LLM provider - "claude" or "gemini" (default: "claude")
+            api_key: API key (if None, will use environment variables)
+            model: Model to use (if None, will use default for provider)
         """
-        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
-        if not self.api_key:
-            raise ValueError(
-                "API key required. Set ANTHROPIC_API_KEY environment variable "
-                "or pass api_key parameter."
-            )
+        self.provider = provider.lower()
 
-        self.client = Anthropic(api_key=self.api_key)
-        self.model = model
+        if self.provider == "claude":
+            self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
+            if not self.api_key:
+                raise ValueError(
+                    "API key required. Set ANTHROPIC_API_KEY environment variable "
+                    "or pass api_key parameter."
+                )
+            self.client = Anthropic(api_key=self.api_key)
+            self.model = model or "claude-3-5-haiku-20241022"
+
+        elif self.provider == "gemini":
+            # Gemini via OpenRouter
+            self.api_key = api_key or os.getenv('OPENROUTER_API_KEY')
+            if not self.api_key:
+                raise ValueError(
+                    "OpenRouter API key required. Set OPENROUTER_API_KEY environment variable "
+                    "or pass api_key parameter."
+                )
+            self.client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.api_key
+            )
+            self.model = model or "google/gemini-2.0-flash-001:free"
+
+        else:
+            raise ValueError(f"Unsupported provider: {provider}. Use 'claude' or 'gemini'.")
 
     def analyze_segment(
         self,
@@ -60,29 +87,52 @@ class LLMAnalyzer:
             context
         )
 
-        # Call Claude API
+        # Call LLM API
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=1024,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
-            )
+            if self.provider == "claude":
+                response_text = self._call_claude(prompt)
+            elif self.provider == "gemini":
+                response_text = self._call_gemini(prompt)
+            else:
+                raise ValueError(f"Unknown provider: {self.provider}")
 
             # Parse response
-            response_text = response.content[0].text
             interpretation = self._parse_response(response_text)
-
             return interpretation
 
         except Exception as e:
             print(f"Warning: LLM analysis failed: {e}")
             # Return fallback interpretation
             return self._fallback_interpretation(musical_features)
+
+    def _call_claude(self, prompt: str) -> str:
+        """Call Claude API."""
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=1024,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+        return response.content[0].text
+
+    def _call_gemini(self, prompt: str) -> str:
+        """Call Gemini via OpenRouter."""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=1024,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
 
     def _build_prompt(
         self,
@@ -276,13 +326,14 @@ Segment moods: {', '.join(moods[:10])}
 Respond with just the description, no additional formatting."""
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=200,
-                messages=[{"role": "user", "content": prompt}]
-            )
+            if self.provider == "claude":
+                response_text = self._call_claude(prompt)
+            elif self.provider == "gemini":
+                response_text = self._call_gemini(prompt)
+            else:
+                response_text = "Mixed emotional journey"
 
-            return response.content[0].text.strip()
+            return response_text.strip()
 
         except Exception as e:
             print(f"Warning: Overall analysis failed: {e}")

@@ -28,6 +28,8 @@ class MusicMoodAnalyzer:
         lyrics_path: Optional[str] = None,
         use_llm: bool = True,
         use_separation: bool = True,
+        llm_provider: str = "gemini",
+        llm_model: Optional[str] = None,
         api_key: Optional[str] = None
     ):
         """
@@ -38,7 +40,9 @@ class MusicMoodAnalyzer:
             lyrics_path: Path to the lyrics text file
             use_llm: Whether to use LLM for mood interpretation
             use_separation: Whether to use source separation for instruments/vocals
-            api_key: Anthropic API key for LLM analysis
+            llm_provider: LLM provider - "claude" or "gemini" (default: "gemini")
+            llm_model: LLM model to use (optional, uses provider default)
+            api_key: API key for LLM analysis (provider-specific)
         """
         self.audio_path = audio_path
         self.lyrics_path = lyrics_path
@@ -56,8 +60,12 @@ class MusicMoodAnalyzer:
         )
 
         if use_llm:
-            print("Initializing LLM analyzer...")
-            self.llm_analyzer = LLMAnalyzer(api_key=api_key)
+            print(f"Initializing LLM analyzer (provider: {llm_provider})...")
+            self.llm_analyzer = LLMAnalyzer(
+                provider=llm_provider,
+                api_key=api_key,
+                model=llm_model
+            )
         else:
             self.llm_analyzer = None
 
@@ -265,8 +273,20 @@ def main():
         help='Fixed time per lyric line in seconds (default: auto-calculate)'
     )
     parser.add_argument(
+        '--provider',
+        '-p',
+        choices=['claude', 'gemini'],
+        default='gemini',
+        help='LLM provider: claude or gemini via OpenRouter (default: gemini)'
+    )
+    parser.add_argument(
+        '--model',
+        '-m',
+        help='LLM model to use (default: provider-specific default)'
+    )
+    parser.add_argument(
         '--api-key',
-        help='Anthropic API key (or set ANTHROPIC_API_KEY env var)'
+        help='API key for LLM provider (ANTHROPIC_API_KEY or OPENROUTER_API_KEY env var)'
     )
 
     args = parser.parse_args()
@@ -285,6 +305,8 @@ def main():
         lyrics_path=args.lyrics,
         use_llm=not args.no_llm,
         use_separation=not args.no_separation,
+        llm_provider=args.provider,
+        llm_model=args.model,
         api_key=args.api_key
     )
 
